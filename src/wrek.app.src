@@ -1,0 +1,16 @@
+{application, wrek,
+ [{description, "An OTP application"},
+  {vsn, "0.0.1"},
+  {registered, [wrek_sup]},
+  {mod, {wrek_app, []}},
+  {applications,
+   [kernel,
+    stdlib
+   ]},
+  {env,[]},
+  {modules, []},
+
+  {maintainers, []},
+  {licenses, ["Apache 2.0"]},
+  {links, []}
+ ]}.
