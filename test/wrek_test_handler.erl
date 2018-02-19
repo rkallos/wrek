@@ -1,4 +1,5 @@
 -module(wrek_test_handler).
+-include("wrek_event.hrl").
 
 -export([handle_call/2,
          handle_event/2,
@@ -23,7 +24,7 @@ handle_call(_, State) ->
     {ok, ok, State}.
 
 
-handle_event({wrek, _, {wrek, error}, _}, State) ->
+handle_event(#wrek_event{type = {wrek, error}}, State) ->
     #state{
        caller = Caller,
        count = Count
@@ -31,7 +32,7 @@ handle_event({wrek, _, {wrek, error}, _}, State) ->
     Caller ! (Count + 1),
     remove_handler;
 
-handle_event({wrek, _, {wrek, done}}, State) ->
+handle_event(#wrek_event{type = {wrek, done}}, State) ->
     #state{
        caller = Caller,
        count = Count
