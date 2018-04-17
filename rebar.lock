@@ -1,4 +1,6 @@
-[{<<"erlexec">>,
-  {git,"https://github.com/adgear/erlexec.git",
-       {ref,"e0f94dd02ee186b4426d35791683ec4bea8184cc"}},
-  0}].
+{"1.1.0",
+[{<<"erlexec">>,{pkg,<<"erlexec">>,<<"1.7.4">>},0}]}.
+[
+{pkg_hash,[
+ {<<"erlexec">>, <<"F69091121625BC93E6DAD4BB1B131E3E15BCB717EC40EC77C1DE77B6823CC909">>}]}
+].
