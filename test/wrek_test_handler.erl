@@ -1,7 +1,8 @@
 -module(wrek_test_handler).
 -include("wrek_event.hrl").
 
--export([handle_call/2,
+-export([code_change/3,
+         handle_call/2,
          handle_event/2,
          handle_info/2,
          init/1,
@@ -16,6 +17,9 @@
 
 
 %% callbacks
+
+code_change(_OldVsn, State, _Extra) ->
+    {ok, State}.
 
 handle_call(get, State) ->
     {ok, State#state.count, State};
