@@ -1,5 +1,6 @@
 -module(wrek_tests).
 -include_lib("eunit/include/eunit.hrl").
+-include("wrek_event.hrl").
 
 from_verts_ok_test() ->
     Verts = #{
@@ -127,6 +128,12 @@ event_bad_test() ->
     % {wrek, done} =
     % (3 * #ok_verts) + (4 * #bad_verts) + 2
     ?assertEqual((3 * maps:size(VertMap)) + 3, Count).
+
+
+event_time_diff_test() ->
+    E1 = #wrek_event{},
+    E2 = #wrek_event{},
+    ?assert(wrek_event:time_diff(E1, E2) >= 0).
 
 
 %% private
