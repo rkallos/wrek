@@ -1,5 +1,5 @@
 -record(wrek_event, {
-          timestamp = erlang:timestamp() :: erlang:timestamp(),
+          timestamp = erlang:monotonic_time() :: integer(),
           id        = undefined :: pos_integer() | {pos_integer(), pos_integer()},
           type      = undefined :: atom() | {atom(), atom()},
           msg       = undefined :: any()
