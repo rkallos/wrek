@@ -5,14 +5,19 @@
          start/2]).
 
 -behaviour(gen_server).
--export([code_change/3,
-         handle_call/3,
-         handle_cast/2,
-         handle_info/2,
-         init/1,
-         terminate/2]).
+-export([
+    code_change/3,
+    handle_call/3,
+    handle_cast/2,
+    handle_info/2,
+    init/1,
+    terminate/2
+]).
 
 -type dag_id() :: pos_integer().
+-type vert_id() :: {pos_integer(), pos_integer()}.
+
+-define(id(), erlang:unique_integer([positive, monotonic])).
 
 -type vert_defn() :: #{
     module := module(),
@@ -25,20 +30,22 @@
 -type option() ::
     {event_manager, pid()}.
 
--define(id(), erlang:unique_integer([positive, monotonic])).
-
--export_type([dag_id/0,
-              dag_map/0,
-              option/0,
-              vert_defn/0]).
+-export_type([
+    dag_id/0,
+    dag_map/0,
+    option/0,
+    vert_defn/0,
+    vert_id/0
+]).
 
 -record(state, {
-          children  = #{}                               :: #{pid() => any()},
-          dag       = undefined                         :: digraph:graph() | undefined,
-          event_mgr = undefined                         :: pid() | undefined,
-          id        = ?id(),
-          sandbox   = undefined                         :: file:filename_all() | undefined
-         }).
+    children  = #{}       :: #{pid() => any()},
+    dag       = undefined :: digraph:graph() | undefined,
+    event_mgr = undefined :: pid() | undefined,
+    id        = ?id()     :: dag_id(),
+    sandbox   = undefined :: file:filename_all() | undefined
+}).
+
 -type state() :: #state{}.
 
 
