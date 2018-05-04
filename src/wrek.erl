@@ -25,6 +25,8 @@
 -type option() ::
     {event_manager, pid()}.
 
+-define(id(), erlang:unique_integer([positive, monotonic])).
+
 -export_type([dag_id/0,
               dag_map/0,
               option/0,
@@ -34,7 +36,7 @@
           children  = #{}                               :: #{pid() => any()},
           dag       = undefined                         :: digraph:graph() | undefined,
           event_mgr = undefined                         :: pid() | undefined,
-          id        = erlang:unique_integer([positive]) :: dag_id(),
+          id        = ?id(),
           sandbox   = undefined                         :: file:filename_all() | undefined
          }).
 -type state() :: #state{}.
@@ -55,7 +57,7 @@ start(Defns) ->
 -spec start(dag_map(), [option()]) -> supervisor:startchild_ret().
 
 start(Defns, Opts) ->
-    Id = erlang:unique_integer([positive]),
+    Id = ?id(),
     ChildSpec = #{
       id => Id,
       start => {gen_server, start_link, [?MODULE, {Id, Defns, Opts}, []]},
@@ -153,9 +155,6 @@ init({Id, DagMap, Opts}) ->
             Pid
     end,
 
-    %% Id = make_dag_id(),
-    %% Id = erlang:unique_integer([positive]),
-
     Sandbox = make_dag_sandbox(Id),
 
     State = #state{
@@ -208,12 +207,6 @@ is_vert_done(_) -> false.
 is_vert_ready(Dag, Vertex) ->
     Deps = [digraph:vertex(Dag, V) || V <- wrek_utils:in_vertices(Dag, Vertex)],
     lists:all(fun is_vert_done/1, Deps).
-
-
-%% -spec make_dag_id() -> pos_integer().
-
-%% make_dag_id() ->
-%%     erlang:unique_integer([positive]).
 
 
 -define(DIRNAME,
@@ -281,7 +274,7 @@ start_vert(State = #state{dag = Dag, id = DagId}, Name) ->
        event_mgr = EventMgr,
        id = DagId
      } = State,
-    VertId = {DagId, erlang:unique_integer([positive])},
+    VertId = {DagId, ?id()},
     {Name, Label0} = digraph:vertex(Dag, Name),
     Label = Label0#{id => VertId},
     digraph:add_vertex(Dag, Name, Label),
