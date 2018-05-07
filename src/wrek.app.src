@@ -1,6 +1,6 @@
 {application, wrek,
  [{description, "An OTP application"},
-  {vsn, "2.0.1"},
+  {vsn, "2.0.2"},
   {registered, [wrek_sup]},
   {mod, {wrek_app, []}},
   {applications,
