@@ -11,9 +11,11 @@
 
 
 -record(state, {
-          caller = undefined :: pid(),
-          count = 0 :: integer()
-         }).
+    caller = undefined :: pid(),
+    count = 0 :: integer(),
+    evts = [] :: [wrek_event()],
+    fail_mode = total :: total | partial
+}).
 
 
 %% callbacks
@@ -28,33 +30,36 @@ handle_call(_, State) ->
     {ok, ok, State}.
 
 
-handle_event(#wrek_event{type = {wrek, error}}, State) ->
-    #state{
-       caller = Caller,
-       count = Count
-      } = State,
-    Caller ! (Count + 1),
-    remove_handler;
+handle_event(Evt = #wrek_event{type = {wrek, error}},
+    State = #state{fail_mode = total}) ->
+    finish(Evt, State);
 
-handle_event(#wrek_event{type = {wrek, done}}, State) ->
-    #state{
-       caller = Caller,
-       count = Count
-      } = State,
-    Caller ! (Count + 1),
-    remove_handler;
+handle_event(Evt = #wrek_event{type = {wrek, done}}, State) ->
+    finish(Evt, State);
 
-handle_event(_Evt, State = #state{count = Count}) ->
-    {ok, State#state{count = Count + 1}}.
+handle_event(Evt, State = #state{count = Count, evts = Evts}) ->
+    {ok, State#state{count = Count + 1, evts = [Evt | Evts]}}.
 
 
 handle_info(_, State) ->
     {ok, State}.
 
 
-init([Caller]) ->
-    {ok, #state{caller = Caller}}.
+init([FailMode, Caller]) ->
+    {ok, #state{caller = Caller, fail_mode = FailMode}}.
 
 
 terminate(_, _State) ->
     ok.
+
+
+%% private
+
+finish(Evt, State) ->
+    #state{
+       caller = Caller,
+       count = Count,
+       evts = Evts
+    } = State,
+    Caller ! #{count => Count + 1, evts => [Evt | Evts]},
+    remove_handler.
