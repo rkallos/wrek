@@ -154,13 +154,7 @@ init({Id, DagMap, Opts}) ->
 
     {ok, Dag} = wrek_utils:from_verts(DagMap),
 
-    EvMgr = case proplists:get_value(event_manager, Opts) of
-        undefined ->
-            {ok, Pid} = gen_event:start_link(),
-            Pid;
-        Pid ->
-            Pid
-    end,
+    EvMgr = proplists:get_value(event_manager, Opts, undefined),
 
     Sandbox = make_dag_sandbox(Id),
 
