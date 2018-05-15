@@ -37,6 +37,13 @@ How to use
 3. `wrek:start(Map)` or `wrek:start(Map, Opts)`.
 
 
+Options
+-------
+
+- `{event_manager, pid()}`: Specify a `gen_event` process to forward events to
+- `{failure_mode, partial | total}` (default: total): Switch between partial and total failure modes. Total failure will immediately shut down all running vertices within a DAG. Partial failure will cancel running all tasks reachable by any failed vertex, but will continue until all vertices finish running.
+
+
 Example
 -------
 ```erlang
@@ -58,3 +65,8 @@ run(_Args, Parent) ->
     three => #{module => true_vert, args => [], deps => [one]}}.
 2> wrek:start(Map). % Runs one, then two+three concurrently
 ```
+
+TODO
+----
+
+- Add timeout for DAG. It might be worthwhile to have timeouts for individual vertices, too, but having a timeout for the whole graph is a start.
