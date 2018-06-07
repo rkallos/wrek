@@ -1,6 +1,6 @@
 -module(wrek).
 
--export([put_data/2,
+-export([put_sandbox/2,
          start/1,
          start/2]).
 
@@ -49,10 +49,10 @@
 -type state() :: #state{}.
 
 
--spec put_data(pid(), any()) -> ok.
+-spec put_sandbox(pid(), file:filename_all()) -> ok.
 
-put_data(Pid, Data) ->
-    gen_server:call(Pid, {put_data, Data}).
+put_sandbox(Pid, Dir) ->
+    gen_server:call(Pid, {put_sandbox, Dir}).
 
 
 -spec start(dag_map()) -> supervisor:startchild_ret().
@@ -84,14 +84,13 @@ code_change(_Req, _From, State) ->
 
 -spec handle_call(_, _, state()) -> {reply, _, state()} | {stop, _, state()}.
 
-handle_call({put_data, Data}, {From, _}, State) ->
+handle_call({put_sandbox, Dir}, {From, _}, State) ->
     #state{
        children = #{From := Name},
        dag = Dag
       } = State,
-    {Name, OldLabel} = digraph:vertex(Dag, Name),
-    Label = maps:merge(OldLabel, Data),
-    digraph:add_vertex(Dag, Name, Label),
+    {Name, Label} = digraph:vertex(Dag, Name),
+    digraph:add_vertex(Dag, Name, Label#{dir => Dir}),
     {reply, ok, State};
 
 handle_call(sandbox, _From, State) ->
@@ -115,9 +114,8 @@ handle_info({'EXIT', Pid, {shutdown, {ok, Data}}}, State0) ->
        dag = Dag
       } = State0,
 
-    {Name, OldLabel} = digraph:vertex(Dag, Name),
-    Label = maps:merge(OldLabel, Data),
-    digraph:add_vertex(Dag, Name, Label),
+    {Name, Label} = digraph:vertex(Dag, Name),
+    digraph:add_vertex(Dag, Name, Label#{internal => Data}),
 
     State = mark_vert_done(State0, Pid),
     start_verts_or_exit(State);
@@ -186,7 +184,7 @@ terminate(_Reason, _State) ->
 
 -spec has_done_key({digraph:vertex(), digraph:label()}) -> boolean().
 
-has_done_key({_, #{done := _}}) -> true;
+has_done_key({_, #{status := _}}) -> true;
 has_done_key(_) -> false.
 
 
@@ -202,7 +200,7 @@ is_dag_done(#state{dag = Dag}) ->
 is_vert_ready(Dag, Vertex) ->
     Deps = [digraph:vertex(Dag, V) || V <- wrek_utils:in_vertices(Dag, Vertex)],
     lists:all(fun
-        ({_, #{done := done}}) -> true;
+        ({_, #{status := done}}) -> true;
         (_) -> false
     end, Deps).
 
@@ -236,7 +234,7 @@ mark_vert(State = #state{children = Children, dag = Dag}, Pid, Status) ->
     #{Pid := Name} = Children,
     Children2 = maps:remove(Pid, Children),
     {Name, Label} = digraph:vertex(Dag, Name),
-    Label2 = Label#{done => Status},
+    Label2 = Label#{status => Status},
     digraph:add_vertex(Dag, Name, Label2),
     State#state{children = Children2}.
 
@@ -262,7 +260,7 @@ propagate_partial_failure(State, Name) ->
     Reachable = digraph_utils:reachable_neighbours([Name], Dag),
     Fun = fun(Vert) ->
         {Vert, Label} = digraph:vertex(Dag, Vert),
-        digraph:add_vertex(Dag, Vert, Label#{done => cancelled}),
+        digraph:add_vertex(Dag, Vert, Label#{status => cancelled}),
         wrek_event:wrek_msg(EvMgr, Id, {vert_cancelled, Vert}),
         ok
     end,

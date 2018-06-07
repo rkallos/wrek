@@ -249,6 +249,54 @@ timeout_test() ->
 
     ?assertEqual(2, length(FailMsgs)).
 
+get_test() ->
+    application:start(wrek),
+
+    IdVerts = [1, 2, 3],
+    Pairs = [{result, From} || From <- IdVerts],
+
+    VertMap = #{
+      1 => id_v(1, []),
+      2 => id_v(2, [1]),
+      3 => id_v(3, [1]),
+      get => get_v(Pairs)
+    },
+
+    {ok, EvMgr} = gen_event:start_link({local, wrek_test_manager}),
+    gen_event:add_handler(EvMgr, wrek_test_handler, [total, self()]),
+
+    Opts = [{event_manager, EvMgr}, {failure_mode, total}],
+    {ok, _Pid} = wrek:start(VertMap, Opts),
+
+    Msgs = receive
+        #{evts := M} -> M
+    end,
+
+    gen_event:stop(EvMgr),
+
+    IdNameMap = lists:foldl(fun
+        (#wrek_event{id = Id, type = {vert, start}, msg = {Name, _, _}}, Acc) ->
+            Acc#{Id => Name};
+        (_, Acc) -> Acc
+    end, #{}, Msgs),
+
+    ReturnVals = lists:foldl(fun
+        (#wrek_event{id = Id, type = {vert, done}, msg = {ok, Val}}, Acc) ->
+            #{Id := Name} = IdNameMap,
+            Acc#{Name => Val};
+        (_, Acc) -> Acc
+    end, #{}, Msgs),
+
+    GetExpect = #{
+      1 => 1,
+      2 => 2,
+      3 => 3
+    },
+
+    ?assertMatch(#{1 := #{result := 1}}, ReturnVals),
+    ?assertMatch(#{2 := #{result := 2}}, ReturnVals),
+    ?assertMatch(#{3 := #{result := 3}}, ReturnVals),
+    ?assertMatch(#{get := GetExpect}, ReturnVals).
 
 %% private
 
@@ -257,3 +305,10 @@ ok_v(Deps) ->
 
 bad_v(Deps) ->
     #{module => wrek_bad_vert, args => [], deps => Deps}.
+
+id_v(Val, Deps) ->
+    #{module => wrek_id_vert, args => [Val], deps => Deps}.
+
+get_v(Pairs) ->
+    Deps = [Dep || {_K, Dep} <- Pairs],
+    #{module => wrek_get_vert, args => Pairs, deps => Deps}.
