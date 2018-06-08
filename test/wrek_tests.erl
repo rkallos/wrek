@@ -116,9 +116,11 @@ event_bad_test() ->
 
     {ok, _Pid} = wrek:start(VertMap, [{event_manager, EvMgr}]),
 
-    Count = receive
-        #{count := Cnt} -> Cnt
+    Map = receive
+        M -> M
     end,
+
+    #{count := Count} = Map,
 
     gen_event:stop(EvMgr),
 
@@ -127,7 +129,7 @@ event_bad_test() ->
     % ({starting_vert}, {vert, start}, {exec, exit_status}, {vert, done}) * #bad_verts +
     % {wrek, done} =
     % (3 * #ok_verts) + (4 * #bad_verts) + 2
-    ?assertEqual((3 * maps:size(VertMap)) + 3, Count).
+    ?assertEqual((3 * maps:size(VertMap)) + 2, Count).
 
 
 event_time_diff_test() ->
@@ -210,6 +212,30 @@ partial_success_test() ->
     ?assertEqual(1, length(FailMsgs)),
     % bad_three, four
     ?assertEqual(2, length(CancelMsgs)).
+
+
+timeout_test() ->
+    VertDefn = #{module => wrek_sleep_vert, args => [], deps => [], timeout => 0},
+    VertMap = #{cat => VertDefn},
+
+    {ok, EvMgr} = gen_event:start_link({local, wrek_test_manager}),
+    gen_event:add_handler(EvMgr, wrek_test_handler, [total, self()]),
+
+    {ok, _Pid} = wrek:start(VertMap, [{event_manager, EvMgr}]),
+
+    Map = receive
+        M -> M
+    end,
+
+    gen_event:stop(EvMgr),
+
+    FailMsgs = lists:filter(fun
+        (#wrek_event{type = {wrek, error}, msg = {vert, _}}) -> true;
+        (#wrek_event{type = {vert, done}, msg = timeout}) -> true;
+        (_) -> false
+    end, maps:get(evts, Map)),
+
+    ?assertEqual(2, length(FailMsgs)).
 
 
 %% private
