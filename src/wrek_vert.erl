@@ -145,6 +145,14 @@ handle_cast(_Req, State) ->
 -spec handle_info(_, state()) ->
     {noreply, state()} | {stop, normal | {error, _}, state()}.
 
+handle_info(timeout, State) ->
+    #state{
+        event_mgr = EvMgr,
+        id = Id
+    } = State,
+    wrek_event:vert_done(EvMgr, Id, timeout),
+    {stop, {shutdown, timeout}, State};
+
 handle_info({'EXIT', _Pid, Term}, State) ->
     #state{
        event_mgr = EvMgr,
@@ -162,7 +170,13 @@ handle_info(_Req, State) ->
 
 init({Data, EventMgr, Id, Name, Parent}) ->
     process_flag(trap_exit, true),
-    #{Name := #{module := Module, args := Args}} = Data,
+    #{Name := Map = #{module := Module, args := Args}} = Data,
+
+    case Map of
+        #{timeout := Ms} ->
+            {ok, _TRef} = timer:send_after(Ms, timeout);
+        _ -> ok
+    end,
 
     wrek_event:vert_start(EventMgr, Id, Name, Module, Args),
 
