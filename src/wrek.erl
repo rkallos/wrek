@@ -27,8 +27,7 @@
 
 -type dag_map() :: #{any() := vert_defn()} | [{any(), vert_defn()}].
 
--type option() ::
-    {event_manager, pid()}.
+-type option() :: {event_manager, pid()} | {failure_mode, partial | total}.
 
 -export_type([
     dag_id/0,
@@ -39,11 +38,12 @@
 ]).
 
 -record(state, {
-    children  = #{}       :: #{pid() => any()},
-    dag       = undefined :: digraph:graph() | undefined,
-    event_mgr = undefined :: pid() | undefined,
-    id        = ?id()     :: dag_id(),
-    sandbox   = undefined :: file:filename_all() | undefined
+    children     = #{}       :: #{pid() => any()},
+    dag          = undefined :: digraph:graph() | undefined,
+    event_mgr    = undefined :: pid() | undefined,
+    failure_mode = total     :: partial | total,
+    id           = ?id()     :: dag_id(),
+    sandbox      = undefined :: file:filename_all() | undefined
 }).
 
 -type state() :: #state{}.
@@ -58,7 +58,7 @@ put_data(Pid, Data) ->
 -spec start(dag_map()) -> supervisor:startchild_ret().
 
 start(Defns) ->
-    start(Defns, default_options()).
+    start(Defns, []).
 
 
 -spec start(dag_map(), [option()]) -> supervisor:startchild_ret().
@@ -120,28 +120,25 @@ handle_info({'EXIT', Pid, {shutdown, {ok, Data}}}, State0) ->
     digraph:add_vertex(Dag, Name, Label),
 
     State = mark_vert_done(State0, Pid),
-    case is_dag_done(State) of
-        true ->
-            #state{
-               event_mgr = EvMgr,
-               id = Id
-              } = State,
-            wrek_event:wrek_done(EvMgr, Id),
-            {stop, normal, State};
-        false ->
-            {ok, State2} = start_verts(State),
-            {noreply, State2}
-    end;
+    start_verts_or_exit(State);
 
 handle_info({'EXIT', Pid, {shutdown, Reason}}, State) ->
     #state{
        children = Children,
        event_mgr = EvMgr,
+       failure_mode = FailMode,
        id = Id
       } = State,
     #{Pid := Name} = Children,
     wrek_event:wrek_error(EvMgr, Id, {vert, Name}),
-    {stop, {error, Reason}, State};
+    case FailMode of
+        total ->
+            {stop, {error, Reason}, State};
+        partial ->
+            State2 = mark_vert_failed(State, Pid),
+            propagate_partial_failure(State2, Name),
+            start_verts_or_exit(State)
+    end;
 
 handle_info(_Req, State) ->
     {noreply, State}.
@@ -154,19 +151,15 @@ init({Id, DagMap, Opts}) ->
 
     {ok, Dag} = wrek_utils:from_verts(DagMap),
 
-    EvMgr = case proplists:get_value(event_manager, Opts) of
-        undefined ->
-            {ok, Pid} = gen_event:start_link(),
-            Pid;
-        Pid ->
-            Pid
-    end,
+    EvMgr = proplists:get_value(event_manager, Opts, undefined),
+    FailMode = proplists:get_value(failure_mode, Opts, total),
 
     Sandbox = make_dag_sandbox(Id),
 
     State = #state{
         dag = Dag,
         event_mgr = EvMgr,
+        failure_mode = FailMode,
         id = Id,
         sandbox = Sandbox
      },
@@ -191,29 +184,27 @@ terminate(_Reason, _State) ->
 
 %% private
 
+-spec has_done_key({digraph:vertex(), digraph:label()}) -> boolean().
+
+has_done_key({_, #{done := _}}) -> true;
+has_done_key(_) -> false.
+
+
 -spec is_dag_done(state()) -> boolean().
 
 is_dag_done(#state{dag = Dag}) ->
-    IsTerminal = fun(V) -> digraph:out_degree(Dag, V) =:= 0 end,
-    TerminalVerts = lists:filter(IsTerminal, digraph:vertices(Dag)),
-
-    Pred = fun({_Name, #{done := true}}) -> true;
-              (_) -> false
-           end,
-    lists:all(Pred, [digraph:vertex(Dag, V) || V <- TerminalVerts]).
-
-
--spec is_vert_done({digraph:vertex(), digraph:label()}) -> boolean().
-
-is_vert_done({_, #{done := true}}) -> true;
-is_vert_done(_) -> false.
+    Verts = [digraph:vertex(Dag, V) || V <- digraph:vertices(Dag)],
+    lists:all(fun has_done_key/1, Verts).
 
 
 -spec is_vert_ready(digraph:graph(), digraph:vertex()) -> boolean().
 
 is_vert_ready(Dag, Vertex) ->
     Deps = [digraph:vertex(Dag, V) || V <- wrek_utils:in_vertices(Dag, Vertex)],
-    lists:all(fun is_vert_done/1, Deps).
+    lists:all(fun
+        ({_, #{done := done}}) -> true;
+        (_) -> false
+    end, Deps).
 
 
 -define(DIRNAME,
@@ -239,15 +230,43 @@ make_vert_data(#state{dag = Dag}, Name) ->
     maps:from_list(Reaching).
 
 
--spec mark_vert_done(state(), pid()) -> state().
+-spec mark_vert(state(), pid(), done | failed) -> state().
 
-mark_vert_done(State = #state{children = Children, dag = Dag}, Pid) ->
+mark_vert(State = #state{children = Children, dag = Dag}, Pid, Status) ->
     #{Pid := Name} = Children,
     Children2 = maps:remove(Pid, Children),
     {Name, Label} = digraph:vertex(Dag, Name),
-    Label2 = Label#{done => true},
+    Label2 = Label#{done => Status},
     digraph:add_vertex(Dag, Name, Label2),
     State#state{children = Children2}.
+
+
+-spec mark_vert_failed(state(), pid()) -> state().
+
+mark_vert_failed(State, Pid) -> mark_vert(State, Pid, failed).
+
+
+-spec mark_vert_done(state(), pid()) -> state().
+
+mark_vert_done(State, Pid) -> mark_vert(State, Pid, done).
+
+
+-spec propagate_partial_failure(state(), digraph:vertex()) -> ok.
+
+propagate_partial_failure(State, Name) ->
+    #state{
+      dag = Dag,
+      event_mgr = EvMgr,
+      id = Id
+    } = State,
+    Reachable = digraph_utils:reachable_neighbours([Name], Dag),
+    Fun = fun(Vert) ->
+        {Vert, Label} = digraph:vertex(Dag, Vert),
+        digraph:add_vertex(Dag, Vert, Label#{done => cancelled}),
+        wrek_event:wrek_msg(EvMgr, Id, {vert_cancelled, Vert}),
+        ok
+    end,
+    lists:foreach(Fun, Reachable).
 
 
 -spec ready_verts(state()) -> [digraph:vertex()].
@@ -255,7 +274,7 @@ mark_vert_done(State = #state{children = Children, dag = Dag}, Pid) ->
 ready_verts(#state{dag = Dag, children = Children}) ->
     [Vertex || Vertex <- digraph:vertices(Dag),
         is_vert_ready(Dag, Vertex),
-        not is_vert_done(digraph:vertex(Dag, Vertex)),
+        not has_done_key(digraph:vertex(Dag, Vertex)),
         not lists:member(Vertex, maps:values(Children))].
 
 
@@ -292,7 +311,18 @@ start_vert(State = #state{dag = Dag, id = DagId}, Name) ->
     gen_server:start_link(wrek_vert, {Data, EventMgr, VertId, Name, self()}, []).
 
 
-% private
+-spec start_verts_or_exit(state()) -> {noreply, state()} | {stop, normal, state()}.
 
-default_options() ->
-    [].
+start_verts_or_exit(State) ->
+    case is_dag_done(State) of
+        true ->
+            #state{
+               event_mgr = EvMgr,
+               id = Id
+              } = State,
+            wrek_event:wrek_done(EvMgr, Id),
+            {stop, normal, State};
+        false ->
+            {ok, State2} = start_verts(State),
+            {noreply, State2}
+    end.

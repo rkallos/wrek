@@ -77,7 +77,7 @@ event_ok_test() ->
     application:start(wrek),
 
     {ok, EvMgr} = gen_event:start_link({local, wrek_test_manager}),
-    gen_event:add_handler(EvMgr, wrek_test_handler, [self()]),
+    gen_event:add_handler(EvMgr, wrek_test_handler, [total, self()]),
 
     VertMap = #{
       one => ok_v([]),
@@ -89,7 +89,7 @@ event_ok_test() ->
     {ok, _Pid} = wrek:start(VertMap, [{event_manager, EvMgr}]),
 
     Count = receive
-        Cnt -> Cnt
+        #{count := Cnt} -> Cnt
     end,
 
     gen_event:stop(EvMgr),
@@ -105,7 +105,7 @@ event_bad_test() ->
     application:start(wrek),
 
     {ok, EvMgr} = gen_event:start_link({local, wrek_test_manager}),
-    gen_event:add_handler(EvMgr, wrek_test_handler, [self()]),
+    gen_event:add_handler(EvMgr, wrek_test_handler, [total, self()]),
 
     VertMap = #{
       one => ok_v([]),
@@ -117,7 +117,7 @@ event_bad_test() ->
     {ok, _Pid} = wrek:start(VertMap, [{event_manager, EvMgr}]),
 
     Count = receive
-        Cnt -> Cnt
+        #{count := Cnt} -> Cnt
     end,
 
     gen_event:stop(EvMgr),
@@ -134,6 +134,82 @@ event_time_diff_test() ->
     E1 = #wrek_event{},
     E2 = #wrek_event{},
     ?assert(wrek_event:time_diff(E1, E2) >= 0).
+
+
+fail_cancels_transitive_closure_test() ->
+    application:start(wrek),
+
+    VertMap = #{
+      one => bad_v([]),
+      two => ok_v([one]),
+      three => ok_v([two])
+    },
+
+    {ok, EvMgr} = gen_event:start_link({local, wrek_test_manager}),
+    gen_event:add_handler(EvMgr, wrek_test_handler, [partial, self()]),
+
+    Opts = [{event_manager, EvMgr}, {failure_mode, partial}],
+    {ok, _Pid} = wrek:start(VertMap, Opts),
+
+    Msgs = receive
+        #{evts := M} -> M
+    end,
+
+    gen_event:stop(EvMgr),
+
+    CancelMsgs = lists:filter(fun
+        (#wrek_event{msg = {vert_cancelled, _}}) -> true;
+        (_) -> false
+    end, Msgs),
+
+    ?assertEqual(2, length(CancelMsgs)).
+
+
+partial_success_test() ->
+    application:start(wrek),
+
+    VertMap = #{
+      one => ok_v([]),
+      bad_two => bad_v([one]),
+      bad_three => bad_v([bad_two]),
+      ok_two => ok_v([one]),
+      ok_three => ok_v([ok_two]),
+      four => ok_v([ok_three, bad_three])
+    },
+
+    {ok, EvMgr} = gen_event:start_link({local, wrek_test_manager}),
+    gen_event:add_handler(EvMgr, wrek_test_handler, [partial, self()]),
+
+    Opts = [{event_manager, EvMgr}, {failure_mode, partial}],
+    {ok, _Pid} = wrek:start(VertMap, Opts),
+
+    Msgs = receive
+        #{evts := M} -> M
+    end,
+
+    gen_event:stop(EvMgr),
+
+    SuccessMsgs = lists:filter(fun
+        (#wrek_event{type = {vert, done}, msg = {ok, _}}) -> true;
+        (_) -> false
+    end, Msgs),
+
+    CancelMsgs = lists:filter(fun
+        (#wrek_event{msg = {vert_cancelled, _}}) -> true;
+        (_) -> false
+    end, Msgs),
+
+    FailMsgs = lists:filter(fun
+        (#wrek_event{type = {_, error}, msg = {vert, _}}) -> true;
+        (_) -> false
+    end, Msgs),
+
+    % one, ok_two, ok_three
+    ?assertEqual(3, length(SuccessMsgs)),
+    % bad_two
+    ?assertEqual(1, length(FailMsgs)),
+    % bad_three, four
+    ?assertEqual(2, length(CancelMsgs)).
 
 
 %% private
