@@ -9,7 +9,7 @@ clean:
 
 compile:
 	@echo "Running rebar3 compile..."
-	@$(REBAR) compile
+	@$(REBAR) as compile compile
 
 dialyzer:
 	@echo "Running rebar3 dialyze..."

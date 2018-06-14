@@ -8,11 +8,15 @@
 -define(SERVER, ?MODULE).
 
 
+-spec start_link() -> {ok, pid()} | ignore | {error, term()}.
+
 start_link() ->
     supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
 
 %% Callbacks
+
+-spec init([]) -> {ok, {supervisor:sup_flags(), [supervisor:child_spec()]}}.
 
 init([]) ->
     SupFlags = #{
