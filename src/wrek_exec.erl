@@ -24,13 +24,14 @@ exec(Dir0, Cmd0, Env, EventFun) ->
         sync,
         {cd, Dir},
         {env, Env},
+        {kill_timeout, 0},
         {stdout, Fun},
         {stderr, Fun}
      ],
 
     Cmd = lists:flatten(Cmd0),
 
-    case exec:run(Cmd, ExecOpts) of
+    case exec:run_link(Cmd, ExecOpts) of
         {ok, []} -> ok;
         {error, [{exit_status, ExitStatus}]} ->
             EventFun({exit_status, ExitStatus}),

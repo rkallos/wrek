@@ -308,7 +308,8 @@ start_vert(State = #state{dag = Dag, id = DagId}, Name) ->
     wrek_event:wrek_msg(EventMgr, DagId, {starting_vert, VertId}),
 
     Data = make_vert_data(State, Name),
-    gen_server:start_link(wrek_vert, {Data, EventMgr, VertId, Name, self()}, []).
+    Args = {Data, EventMgr, VertId, Name, self()},
+    gen_server:start_link(wrek_vert, Args, []).
 
 
 -spec start_verts_or_exit(state()) -> {noreply, state()} | {stop, normal, state()}.
