@@ -88,17 +88,28 @@ event_ok_test() ->
 
     {ok, _Pid} = wrek:start(VertMap, [{event_manager, EvMgr}]),
 
-    Count = receive
-        #{count := Cnt} -> Cnt
+    Events = receive
+        #{evts := Evts} -> Evts
     end,
 
     gen_event:stop(EvMgr),
 
-    % {wrek, start} +
-    % ({starting_vert}, {vert, start}, {vert, done}) * #verts +
-    % {wrek, done} =
-    % (3 * #verts) + 2
-    ?assertEqual((3 * maps:size(VertMap)) + 2, Count).
+    WrekStarts =
+        [E || E = #wrek_event{type = {wrek, start}} <- Events],
+    StartingVerts =
+        [E || E = #wrek_event{msg = {starting_vert, _}} <- Events],
+    VertStarts =
+        [E || E = #wrek_event{type = {vert, start}} <- Events],
+    VertDones =
+        [E || E = #wrek_event{type = {vert, done}} <- Events],
+    WrekDones =
+        [E || E = #wrek_event{type = {wrek, done}} <- Events],
+
+    ?assertEqual(1, length(WrekStarts)),
+    ?assertEqual(4, length(StartingVerts)),
+    ?assertEqual(4, length(VertStarts)),
+    ?assertEqual(4, length(VertDones)),
+    ?assertEqual(1, length(WrekDones)).
 
 event_bad_test() ->
     exec:start(),
@@ -116,21 +127,28 @@ event_bad_test() ->
 
     {ok, _Pid} = wrek:start(VertMap, [{event_manager, EvMgr}]),
 
-    Map = receive
-        M -> M
+    Events = receive
+        #{evts := Evts} -> Evts
     end,
-
-    #{count := Count} = Map,
 
     gen_event:stop(EvMgr),
 
-    % {wrek, start} +
-    % ({starting_vert}, {vert, start}, {vert, done}) * #ok_verts +
-    % ({starting_vert}, {vert, start}, {exec, exit_status}, {vert, done}) * #bad_verts +
-    % {wrek, done} =
-    % (3 * #ok_verts) + (4 * #bad_verts) + 2
-    ?assertEqual((3 * maps:size(VertMap)) + 2, Count).
+    WrekStarts =
+        [E || E = #wrek_event{type = {wrek, start}} <- Events],
+    StartingVerts =
+        [E || E = #wrek_event{msg = {starting_vert, _}} <- Events],
+    VertStarts =
+        [E || E = #wrek_event{type = {vert, start}} <- Events],
+    VertDones =
+        [E || E = #wrek_event{type = {vert, done}} <- Events],
+    WrekErrors =
+        [E || E = #wrek_event{type = {wrek, error}} <- Events],
 
+    ?assertEqual(1, length(WrekStarts)),
+    ?assertEqual(4, length(StartingVerts)),
+    ?assertEqual(4, length(VertStarts)),
+    ?assertEqual(4, length(VertDones)),
+    ?assertEqual(1, length(WrekErrors)).
 
 event_time_diff_test() ->
     E1 = #wrek_event{},
@@ -185,26 +203,20 @@ partial_success_test() ->
     Opts = [{event_manager, EvMgr}, {failure_mode, partial}],
     {ok, _Pid} = wrek:start(VertMap, Opts),
 
-    Msgs = receive
+    Events = receive
         #{evts := M} -> M
     end,
 
     gen_event:stop(EvMgr),
 
-    SuccessMsgs = lists:filter(fun
-        (#wrek_event{type = {vert, done}, msg = {ok, _}}) -> true;
-        (_) -> false
-    end, Msgs),
+    SuccessMsgs =
+        [E || E = #wrek_event{type = {vert, done}, msg = {ok, _}} <- Events],
 
-    CancelMsgs = lists:filter(fun
-        (#wrek_event{msg = {vert_cancelled, _}}) -> true;
-        (_) -> false
-    end, Msgs),
+    CancelMsgs =
+        [E || E = #wrek_event{msg = {vert_cancelled, _}} <- Events],
 
-    FailMsgs = lists:filter(fun
-        (#wrek_event{type = {_, error}, msg = {vert, _}}) -> true;
-        (_) -> false
-    end, Msgs),
+    FailMsgs =
+        [E || E = #wrek_event{type = {_, error}, msg = {vert, _}} <- Events],
 
     % one, ok_two, ok_three
     ?assertEqual(3, length(SuccessMsgs)),
