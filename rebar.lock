@@ -1,6 +1,6 @@
 {"1.1.0",
-[{<<"erlexec">>,{pkg,<<"erlexec">>,<<"1.7.4">>},0}]}.
+[{<<"erlexec">>,{pkg,<<"erlexec">>,<<"1.9.3">>},0}]}.
 [
 {pkg_hash,[
- {<<"erlexec">>, <<"F69091121625BC93E6DAD4BB1B131E3E15BCB717EC40EC77C1DE77B6823CC909">>}]}
+ {<<"erlexec">>, <<"3D72AC65424CED35B9658A50E5A0C9DBD5F383E28AC9096E557F0D62926DD8E4">>}]}
 ].
