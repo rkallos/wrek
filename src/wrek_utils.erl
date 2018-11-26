@@ -107,10 +107,18 @@ add_edges(Dag, To, [From | Froms]) ->
     end.
 
 
--spec add_vertices(digraph:graph(), [{any(), wrek:vert_defn()}]) -> ok.
+-spec add_vertices(digraph:graph(), [{any(), wrek:vert_defn()}]) ->
+    ok | {error, any()}.
 
-add_vertices(Dag, Verts) ->
-    lists:foreach(
-      fun({Name, Defn}) -> digraph:add_vertex(Dag, Name, Defn) end,
-      Verts
-     ).
+add_vertices(_Dag, []) ->
+    ok;
+
+add_vertices(Dag, [{Name, Defn} | Rest]) ->
+    case wrek_vert_t:from_defn(Defn) of
+        {ok, Vert} ->
+            Vert2 = wrek_vert_t:set_name(Vert, Name),
+            digraph:add_vertex(Dag, Name, Vert2),
+            add_vertices(Dag, Rest);
+        {error, _} = Err ->
+            Err
+    end.
