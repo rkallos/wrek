@@ -102,13 +102,12 @@ handle_call({exec, Dir, Cmd, Env}, _From, State = #state{event_mgr = EvMgr}) ->
     {reply, Result, State};
 
 handle_call({get, Who0, Key, Default}, _From, State) ->
-    #state{data = Data, vert = MyVert} = State,
     Who = case Who0 of
-        me -> name(MyVert);
+        me -> name(State);
         Other -> Other
     end,
 
-    case Data of
+    case State#state.data of
         #{Who := Vert} ->
             case wrek_vert_t:kv(Vert) of
                 #{Key := Val} ->

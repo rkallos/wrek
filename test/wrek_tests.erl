@@ -8,7 +8,9 @@ from_verts_ok_test() ->
       bar => ok_v([foo]),
       baz => ok_v([bar])
      },
-    {ok, Dag} = wrek_utils:from_verts(Verts),
+    {ok, Wrek} = wrek_t:from_verts(Verts),
+
+    Dag = element(3, Wrek),
 
     ?assertEqual([foo, bar, baz],
                  digraph_utils:topsort(Dag)).
@@ -20,13 +22,13 @@ from_verts_cycle_test() ->
       baz => ok_v([bar])
      },
     ?assertMatch({error, {bad_edge, _}},
-                 wrek_utils:from_verts(Cycle)).
+                 wrek_t:from_verts(Cycle)).
 
 from_verts_missing_dep_test() ->
-    Verts = #{bar => #{deps => [foo]}},
+    Verts = #{bar => ok_v([foo])},
 
     ?assertMatch({error, {bad_vertex, _}},
-                 wrek_utils:from_verts(Verts)).
+                 wrek_t:from_verts(Verts)).
 
 ok_test() ->
     error_logger:tty(false),
