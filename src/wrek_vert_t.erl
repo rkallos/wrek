@@ -82,7 +82,7 @@ fail(Vert = #t{}, Reason) ->
     set_status(Vert2, failed).
 
 
--spec from_defn(map()) -> {ok, t()} | {error, any()}.
+-spec from_defn(map() | t()) -> {ok, t()} | {error, any()}.
 
 from_defn(Map0) when is_map(Map0) ->
     Res0 = #t{},
@@ -107,8 +107,11 @@ from_defn(Map0) when is_map(Map0) ->
             {ok, Res3}
     end;
 
+from_defn(T = #t{}) ->
+    {ok, T};
+
 from_defn(_) ->
-    {error, not_a_map}.
+    {error, not_map_or_record}.
 
 
 -spec has_succeeded(t()) -> boolean().
