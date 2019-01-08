@@ -3,6 +3,7 @@
 -export([
     exec/3,
     exec/4,
+    exec/5,
     get/3,
     get/4,
     get_all/1,
@@ -45,6 +46,13 @@ exec(Pid, Dir0, Cmd0) ->
 
 exec(Pid, Dir0, Cmd0, Env) ->
     gen_server:call(Pid, {exec, Dir0, Cmd0, Env}).
+
+
+-spec exec(pid(), file:filename_all(), string(), list(), fun((any()) -> any())) ->
+    fun(() -> ok | {error, any()}).
+
+exec(Pid, Dir0, Cmd0, Env, EventFun) ->
+    gen_server:call(Pid, {exec, Dir0, Cmd0, Env, EventFun}).
 
 
 -spec get(pid(), any(), any()) -> any().
@@ -98,6 +106,10 @@ handle_call({exec, Dir, Cmd, Env}, _From, State = #state{event_mgr = EvMgr}) ->
         fun(Msg) ->
             wrek_event:exec_output(EvMgr, id(State), Msg)
         end,
+    Result = fun() -> wrek_exec:exec(Dir, Cmd, Env, EventFun) end,
+    {reply, Result, State};
+
+handle_call({exec, Dir, Cmd, Env, EventFun}, _From, State) ->
     Result = fun() -> wrek_exec:exec(Dir, Cmd, Env, EventFun) end,
     {reply, Result, State};
 
