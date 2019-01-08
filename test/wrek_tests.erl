@@ -300,6 +300,24 @@ get_test() ->
     ?assertMatch(#{3 := #{result := 3}}, ReturnVals),
     ?assertMatch(#{get := GetExpect}, ReturnVals).
 
+custom_exec_callback_test() ->
+    Self = self(),
+    Callback = fun({_, Data}) ->
+        Self ! Data
+    end,
+
+    Dag = #{cb => #{module => wrek_echo_vert, args => [Callback, "good"], deps => []}},
+
+    wrek:start(Dag),
+
+    Msg = receive
+        M -> M
+    after
+        500 -> bad
+    end,
+
+    ?assertEqual(Msg, <<"good">>).
+
 %% private
 
 ok_v(Deps) ->
