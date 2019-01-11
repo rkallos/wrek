@@ -142,8 +142,8 @@ is_finished(Vert = #t{}) ->
 
 -spec succeed(t(), map()) -> t().
 
-succeed(Vert = #t{}, Result) ->
-    Vert2 = set_kv(Vert, Result),
+succeed(Vert = #t{kv = Kv}, Result) ->
+    Vert2 = set_kv(Vert, maps:merge(Kv, Result)),
     set_status(Vert2, done).
 
 
