@@ -43,7 +43,9 @@
 -type status_t() :: failed | done | cancelled | undefined.
 -type timeout_t() :: pos_integer() | undefined.
 
--record(t, {
+-define(T, ?MODULE).
+
+-record(?T, {
     args    = []        :: args_t(),
     deps    = []        :: deps_t(),
     dir     = undefined :: dir_t(),
@@ -56,7 +58,7 @@
     timeout = undefined :: timeout_t()
 }).
 
--type t() :: #t{}.
+-type t() :: #?T{}.
 
 -export_type([
     t/0
@@ -66,18 +68,18 @@
 -spec new() -> t().
 
 new() ->
-    #t{}.
+    #?T{}.
 
 
 -spec cancel(t()) -> t().
 
-cancel(Vert = #t{}) ->
+cancel(Vert = #?T{}) ->
     set_status(Vert, cancelled).
 
 
 -spec fail(t(), reason_t()) -> t().
 
-fail(Vert = #t{}, Reason) ->
+fail(Vert = #?T{}, Reason) ->
     Vert2 = set_reason(Vert, Reason),
     set_status(Vert2, failed).
 
@@ -85,7 +87,7 @@ fail(Vert = #t{}, Reason) ->
 -spec from_defn(map() | t()) -> {ok, t()} | {error, any()}.
 
 from_defn(Map0) when is_map(Map0) ->
-    Res0 = #t{},
+    Res0 = #?T{},
 
     MandatoryFields = [
         {module, fun set_module/2},
@@ -107,7 +109,7 @@ from_defn(Map0) when is_map(Map0) ->
             {ok, Res3}
     end;
 
-from_defn(T = #t{}) ->
+from_defn(T = #?T{}) ->
     {ok, T};
 
 from_defn(_) ->
@@ -116,7 +118,7 @@ from_defn(_) ->
 
 -spec has_succeeded(t()) -> boolean().
 
-has_succeeded(Vert = #t{}) ->
+has_succeeded(Vert = #?T{}) ->
     case status(Vert) of
         done ->
             true;
@@ -127,7 +129,7 @@ has_succeeded(Vert = #t{}) ->
 
 -spec is_finished(t()) -> boolean().
 
-is_finished(Vert = #t{}) ->
+is_finished(Vert = #?T{}) ->
     case status(Vert) of
         done ->
             true;
@@ -142,129 +144,129 @@ is_finished(Vert = #t{}) ->
 
 -spec succeed(t(), map()) -> t().
 
-succeed(Vert = #t{kv = Kv}, Result) ->
+succeed(Vert = #?T{kv = Kv}, Result) ->
     Vert2 = set_kv(Vert, maps:merge(Kv, Result)),
     set_status(Vert2, done).
 
 
 -spec args(t()) -> args_t().
 
-args(#t{args = Args}) ->
+args(#?T{args = Args}) ->
     Args.
 
 
 -spec deps(t()) -> deps_t().
 
-deps(#t{deps = Deps}) ->
+deps(#?T{deps = Deps}) ->
     Deps.
 
 
 -spec dir(t()) -> dir_t().
 
-dir(#t{dir = Dir}) ->
+dir(#?T{dir = Dir}) ->
     Dir.
 
 
 -spec id(t()) -> id_t().
 
-id(#t{id = Id}) ->
+id(#?T{id = Id}) ->
     Id.
 
 
 -spec kv(t()) -> kv_t().
 
-kv(#t{kv = Kv}) ->
+kv(#?T{kv = Kv}) ->
     Kv.
 
 
 -spec module(t()) -> module_t().
 
-module(#t{module = Module}) ->
+module(#?T{module = Module}) ->
     Module.
 
 
 -spec name(t()) -> name_t().
 
-name(#t{name = Name}) ->
+name(#?T{name = Name}) ->
     Name.
 
 
 -spec reason(t()) -> reason_t().
 
-reason(#t{reason = Reason}) ->
+reason(#?T{reason = Reason}) ->
     Reason.
 
 
 -spec status(t()) -> status_t().
 
-status(#t{status = Status}) ->
+status(#?T{status = Status}) ->
     Status.
 
 
 -spec timeout(t()) -> timeout_t().
 
-timeout(#t{timeout = Timeout}) ->
+timeout(#?T{timeout = Timeout}) ->
     Timeout.
 
 
 -spec set_args(t(), args_t()) -> t().
 
-set_args(T = #t{}, Args) ->
-    T#t{args = Args}.
+set_args(T = #?T{}, Args) ->
+    T#?T{args = Args}.
 
 
 -spec set_deps(t(), deps_t()) -> t().
 
-set_deps(T = #t{}, Deps) ->
-    T#t{deps = Deps}.
+set_deps(T = #?T{}, Deps) ->
+    T#?T{deps = Deps}.
 
 
 -spec set_dir(t(), dir_t()) -> t().
 
-set_dir(T = #t{}, Dir) ->
-    T#t{dir = Dir}.
+set_dir(T = #?T{}, Dir) ->
+    T#?T{dir = Dir}.
 
 
 -spec set_id(t(), id_t()) -> t().
 
-set_id(T = #t{}, Id) ->
-    T#t{id = Id}.
+set_id(T = #?T{}, Id) ->
+    T#?T{id = Id}.
 
 
 -spec set_kv(t(), kv_t()) -> t().
 
-set_kv(T = #t{}, Kv) ->
-    T#t{kv = Kv}.
+set_kv(T = #?T{}, Kv) ->
+    T#?T{kv = Kv}.
 
 
 -spec set_module(t(), module_t()) -> t().
 
-set_module(T = #t{}, Module) ->
-    T#t{module = Module}.
+set_module(T = #?T{}, Module) ->
+    T#?T{module = Module}.
 
 
 -spec set_name(t(), name_t()) -> t().
 
-set_name(T = #t{}, Name) ->
-    T#t{name = Name}.
+set_name(T = #?T{}, Name) ->
+    T#?T{name = Name}.
 
 
 -spec set_reason(t(), reason_t()) -> t().
 
-set_reason(T = #t{}, Reason) ->
-    T#t{reason = Reason}.
+set_reason(T = #?T{}, Reason) ->
+    T#?T{reason = Reason}.
 
 
 -spec set_status(t(), status_t()) -> t().
 
-set_status(T = #t{}, Status) ->
-    T#t{status = Status}.
+set_status(T = #?T{}, Status) ->
+    T#?T{status = Status}.
 
 
 -spec set_timeout(t(), timeout_t()) -> t().
 
-set_timeout(T = #t{}, Timeout) ->
-    T#t{timeout = Timeout}.
+set_timeout(T = #?T{}, Timeout) ->
+    T#?T{timeout = Timeout}.
 
 
 % private
@@ -288,10 +290,10 @@ load_optional(Vert, Map, FieldSetterPairs) ->
 -spec load(t(), map(), [{atom(), setter_t()}], error | continue) ->
     {ok, {t(), map()}} | {error, any()}.
 
-load(Vert = #t{}, Map, [], _FailMode) ->
+load(Vert = #?T{}, Map, [], _FailMode) ->
     {ok, {Vert, Map}};
 
-load(Vert = #t{}, Map, [{FieldName, Setter} | Rest], FailMode) ->
+load(Vert = #?T{}, Map, [{FieldName, Setter} | Rest], FailMode) ->
     case {Map, FailMode} of
         {#{FieldName := FieldVal}, _} ->
             Vert2 = Setter(Vert, FieldVal),
