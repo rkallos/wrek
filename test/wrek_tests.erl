@@ -302,6 +302,38 @@ get_test() ->
     ?assertMatch(#{3 := #{result := 3}}, ReturnVals),
     ?assertMatch(#{get := GetExpect}, ReturnVals).
 
+sandbox_test() ->
+    application:start(wrek),
+
+    VertMap = #{
+        1 => #{module => wrek_make_sandbox_vert, args => [], deps => []},
+        2 => #{module => wrek_get_sandbox_vert, args => [1], deps => [1]},
+        3 => #{module => wrek_get_sandbox_vert, args => [1], deps => [2]}
+    },
+
+    {ok, EvMgr} = gen_event:start_link({local, wrek_test_manager}),
+    gen_event:add_handler(EvMgr, wrek_test_handler, [total, self()]),
+
+    Opts = [{event_manager, EvMgr}, {failure_mode, total}],
+    {ok, _Pid} = wrek:start(VertMap, Opts),
+
+    Msgs = receive
+        #{evts := M} -> M
+    end,
+
+    gen_event:stop(EvMgr),
+
+    Notifs = lists:foldl(fun
+        (#wrek_event{type = {vert, msg}, msg = {dir, D}}, Acc) ->
+            [D | Acc];
+        (_, Acc) ->
+            Acc
+    end, [], Msgs),
+
+    ?assertEqual(3, length(Notifs)),
+    ?assertEqual(lists:nth(1, Notifs), lists:nth(2, Notifs)),
+    ?assertEqual(lists:nth(2, Notifs), lists:nth(3, Notifs)).
+
 custom_exec_callback_test() ->
     Self = self(),
     Callback = fun({_, Data}) ->
