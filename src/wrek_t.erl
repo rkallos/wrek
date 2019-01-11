@@ -29,12 +29,14 @@
 -type name_t() :: any().
 -type vert_t() :: digraph:vertex().
 
--record(t, {
+-define(T, ?MODULE).
+
+-record(?T, {
     children = #{}   :: #{pid() => vert_t()},
     dag      = new() :: dag_t()
 }).
 
--type t() :: #t{}.
+-type t() :: #?T{}.
 
 -export_type([
     t/0
@@ -43,14 +45,14 @@
 
 -spec add_vertex(t(), vert_t(), wrek_vert_t:t()) -> t().
 
-add_vertex(T = #t{dag = Dag}, Name, Vert) ->
+add_vertex(T = #?T{dag = Dag}, Name, Vert) ->
     digraph:add_vertex(Dag, Name, Vert),
     T.
 
 
 -spec cancel_vertex(t(), vert_t()) -> t().
 
-cancel_vertex(T = #t{}, Name) ->
+cancel_vertex(T = #?T{}, Name) ->
     {Name, Vert} = vertex(T, Name),
     Vert2 = wrek_vert_t:cancel(Vert),
     add_vertex(T, Name, Vert2).
@@ -58,7 +60,7 @@ cancel_vertex(T = #t{}, Name) ->
 
 -spec child(t(), pid()) -> {ok, {vert_t(), wrek_vert_t:t()}} | false.
 
-child(T = #t{children = Children}, Pid) ->
+child(T = #?T{children = Children}, Pid) ->
     case Children of
         #{Pid := Name} ->
             case vertex(T, Name) of
@@ -74,7 +76,7 @@ child(T = #t{children = Children}, Pid) ->
 
 -spec child_failed(t(), pid(), any()) -> t().
 
-child_failed(T = #t{}, Pid, Reason) ->
+child_failed(T = #?T{}, Pid, Reason) ->
     {ok, {Name, Vert}} = child(T, Pid),
     Vert2 = wrek_vert_t:fail(Vert, Reason),
     T2 = add_vertex(T, Name, Vert2),
@@ -84,14 +86,14 @@ child_failed(T = #t{}, Pid, Reason) ->
 
 -spec child_started(t(), vert_t(), pid()) -> t().
 
-child_started(T = #t{children = Children}, Name, Pid) ->
+child_started(T = #?T{children = Children}, Name, Pid) ->
     Children2 = Children#{Pid => Name},
-    T#t{children = Children2}.
+    T#?T{children = Children2}.
 
 
 -spec child_succeeded(t(), pid(), map()) -> t().
 
-child_succeeded(T = #t{}, Pid, Result) ->
+child_succeeded(T = #?T{}, Pid, Result) ->
     {ok, {Name, Vert}} = child(T, Pid),
     Vert2 = wrek_vert_t:succeed(Vert, Result),
     T2 = add_vertex(T, Name, Vert2),
@@ -101,31 +103,31 @@ child_succeeded(T = #t{}, Pid, Result) ->
 
 -spec dependants(t(), vert_t()) -> [vert_t()].
 
-dependants(#t{dag = Dag}, Name) ->
+dependants(#?T{dag = Dag}, Name) ->
     digraph_utils:reachable_neighbours([Name], Dag).
 
 
 -spec dependencies(t(), vert_t()) -> [vert_t()].
 
-dependencies(#t{dag = Dag}, Name) ->
+dependencies(#?T{dag = Dag}, Name) ->
     digraph_utils:reaching_neighbours([Name], Dag).
 
 
 -spec edge(t(), vert_t()) -> {edge_t(), vert_t(), vert_t(), label_t()} | false.
 
-edge(#t{dag = Dag}, Edge) ->
+edge(#?T{dag = Dag}, Edge) ->
     digraph:edge(Dag, Edge).
 
 
 -spec edges(t()) -> [edge_t()].
 
-edges(#t{dag = Dag}) ->
+edges(#?T{dag = Dag}) ->
     digraph:edges(Dag).
 
 
 -spec format(t()) -> string().
 
-format(T = #t{}) ->
+format(T = #?T{}) ->
     Verts = [vertex(T, V) || V <- vertices(T)],
     Edges = [edge(T, E) || E <- edges(T)],
     io_lib:format("~p~n", [{Verts, Edges}]).
@@ -140,7 +142,7 @@ from_verts(Verts) when is_map(Verts) ->
 from_verts(Proplist) ->
     case make_vertices(Proplist) of
         {ok, Verts} ->
-            T = #t{},
+            T = #?T{},
             ok = add_vertices(T, Verts),
             case add_dependencies(T, Verts) of
                 ok ->
@@ -155,7 +157,7 @@ from_verts(Proplist) ->
 
 -spec is_active(t()) -> boolean().
 
-is_active(#t{children = Children}) ->
+is_active(#?T{children = Children}) ->
     maps:size(Children) > 0.
 
 
@@ -170,7 +172,7 @@ is_finished(T) ->
 
 -spec ready_verts(t()) -> [vert_t()].
 
-ready_verts(T = #t{dag = Dag, children = Children}) ->
+ready_verts(T = #?T{dag = Dag, children = Children}) ->
     lists:filter(fun(Name) ->
         {Name, Vert} = vertex(T, Name),
         is_vert_ready(T, Name) andalso
@@ -181,13 +183,13 @@ ready_verts(T = #t{dag = Dag, children = Children}) ->
 
 -spec remove_child(t(), pid()) -> t().
 
-remove_child(T = #t{children = Children}, Pid) ->
-    T#t{children = maps:remove(Pid, Children)}.
+remove_child(T = #?T{children = Children}, Pid) ->
+    T#?T{children = maps:remove(Pid, Children)}.
 
 
 -spec set_vert_id(t(), vert_t(), wrek:vert_id()) -> t().
 
-set_vert_id(T = #t{}, Name, Id) ->
+set_vert_id(T = #?T{}, Name, Id) ->
     {Name, Vert} = vertex(T, Name),
     Vert2 = wrek_vert_t:set_id(Vert, Id),
     add_vertex(T, Name, Vert2),
@@ -196,13 +198,13 @@ set_vert_id(T = #t{}, Name, Id) ->
 
 -spec vertex(t(), vert_t()) -> {vert_t(), label_t()} | false.
 
-vertex(#t{dag = Dag}, Vert) ->
+vertex(#?T{dag = Dag}, Vert) ->
     digraph:vertex(Dag, Vert).
 
 
 -spec vertices(t()) -> [vert_t()].
 
-vertices(#t{dag = Dag}) ->
+vertices(#?T{dag = Dag}) ->
     digraph:vertices(Dag).
 
 
@@ -211,10 +213,10 @@ vertices(#t{dag = Dag}) ->
 -spec add_dependencies(t(), [wrek_vert_t:t()]) ->
     ok | {error, any()}.
 
-add_dependencies(_T = #t{}, []) ->
+add_dependencies(_T = #?T{}, []) ->
     ok;
 
-add_dependencies(T = #t{}, [Vert | Rest]) ->
+add_dependencies(T = #?T{}, [Vert | Rest]) ->
     Name = wrek_vert_t:name(Vert),
     Deps = wrek_vert_t:deps(Vert),
     case add_edges(T, Name, Deps) of
@@ -231,7 +233,7 @@ add_dependencies(T = #t{}, [Vert | Rest]) ->
 add_edges(_T, _To, []) ->
     ok;
 
-add_edges(T = #t{dag = Dag}, To, [From | Rest]) ->
+add_edges(T = #?T{dag = Dag}, To, [From | Rest]) ->
     case digraph:add_edge(Dag, From, To) of
         {error, _} = Err ->
             Err;
@@ -242,7 +244,7 @@ add_edges(T = #t{dag = Dag}, To, [From | Rest]) ->
 
 -spec add_vertices(t(), [wrek_vert_t:t()]) -> ok.
 
-add_vertices(#t{dag = Dag}, Defns) ->
+add_vertices(#?T{dag = Dag}, Defns) ->
     lists:foreach(fun(Vert) ->
         Name = wrek_vert_t:name(Vert),
         digraph:add_vertex(Dag, Name, Vert)
