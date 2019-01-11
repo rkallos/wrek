@@ -255,12 +255,13 @@ get_test() ->
     application:start(wrek),
 
     IdVerts = [1, 2, 3],
-    Pairs = [{result, From} || From <- IdVerts],
+    Pairs = [{result, From} || From <- IdVerts] ++ [{extra, 4}],
 
     VertMap = #{
       1 => id_v(1, []),
       2 => id_v(2, [1]),
       3 => id_v(3, [1]),
+      4 => #{module => wrek_true_vert, args => [], deps => [1], extra => 4},
       get => get_v(Pairs)
     },
 
@@ -292,7 +293,8 @@ get_test() ->
     GetExpect = #{
       1 => 1,
       2 => 2,
-      3 => 3
+      3 => 3,
+      4 => 4
     },
 
     ?assertMatch(#{1 := #{result := 1}}, ReturnVals),
