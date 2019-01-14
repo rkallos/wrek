@@ -308,7 +308,8 @@ sandbox_test() ->
     VertMap = #{
         1 => #{module => wrek_make_sandbox_vert, args => [], deps => []},
         2 => #{module => wrek_get_sandbox_vert, args => [1], deps => [1]},
-        3 => #{module => wrek_get_sandbox_vert, args => [1], deps => [2]}
+        3 => #{module => wrek_reuse_sandbox_vert, args => [1], deps => [1]},
+        4 => #{module => wrek_get_sandbox_vert, args => [3], deps => [3]}
     },
 
     {ok, EvMgr} = gen_event:start_link({local, wrek_test_manager}),
@@ -330,9 +331,8 @@ sandbox_test() ->
             Acc
     end, [], Msgs),
 
-    ?assertEqual(3, length(Notifs)),
-    ?assertEqual(lists:nth(1, Notifs), lists:nth(2, Notifs)),
-    ?assertEqual(lists:nth(2, Notifs), lists:nth(3, Notifs)).
+    ?assertEqual(4, length(Notifs)),
+    ?assertEqual(lists:usort(Notifs), [lists:nth(1, Notifs)]).
 
 custom_exec_callback_test() ->
     Self = self(),
