@@ -48,7 +48,7 @@
 -type state() :: #state{}.
 
 
--spec put_sandbox(pid(), file:filename_all()) -> ok.
+-spec put_sandbox(pid(), file:filename_all()) -> {ok, wrek_vert_t:t()}.
 
 put_sandbox(Pid, Dir) ->
     gen_server:call(Pid, {put_sandbox, Dir}).
@@ -87,7 +87,7 @@ handle_call({put_sandbox, Dir}, {From, _}, State = #state{wrek = Wrek}) ->
     {ok, {Name, Vert}} = wrek_t:child(Wrek, From),
     Vert2 = wrek_vert_t:set_dir(Vert, Dir),
     Wrek2 = wrek_t:add_vertex(Wrek, Name, Vert2),
-    {reply, ok, State#state{wrek = Wrek2}};
+    {reply, {ok, Vert2}, State#state{wrek = Wrek2}};
 
 handle_call(sandbox, _From, State) ->
     {reply, State#state.sandbox, State};

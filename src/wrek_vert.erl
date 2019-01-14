@@ -9,6 +9,7 @@
     get_all/1,
     get_sandbox/2,
     make_sandbox/1,
+    reuse_sandbox/2,
     notify/2
 ]).
 
@@ -85,6 +86,12 @@ make_sandbox(Pid) ->
     gen_server:call(Pid, make_sandbox).
 
 
+-spec reuse_sandbox(pid(), any()) -> {ok, file:filename_all()} | {error, term()}.
+
+reuse_sandbox(Pid, Who) ->
+    gen_server:call(Pid, {reuse_sandbox, Who}).
+
+
 -spec notify(pid(), any()) -> ok.
 
 notify(Pid, Msg) ->
@@ -131,12 +138,12 @@ handle_call({get, Who0, Key, Default}, _From, State) ->
             {reply, Default, State}
     end;
 
-handle_call(get_all, _From, #state{data = Data0}) ->
+handle_call(get_all, _From, State = #state{data = Data0}) ->
     Data = maps:fold(fun(Name, Vert, Acc) ->
         D = wrek_vert_t:kv(Vert),
         Acc#{Name => D}
     end, #{}, Data0),
-    {reply, ok, Data};
+    {reply, Data, State};
 
 handle_call({get_sandbox, Who0}, _From, State) ->
     #state{data = Data} = State,
@@ -152,13 +159,31 @@ handle_call({get_sandbox, Who0}, _From, State) ->
             {reply, undefined, State}
     end;
 
-handle_call(make_sandbox, _From, State = #state{parent = Parent}) ->
+handle_call(make_sandbox, _From, State = #state{data = Data, parent = Parent}) ->
     {_DagId, VertId} = id(State),
     DagDir = dag_dir(Parent),
     VertStr = integer_to_list(VertId),
     Dir = wrek_utils:sandbox(DagDir, VertStr),
-    wrek:put_sandbox(Parent, Dir),
-    {reply, Dir, State};
+    {ok, Vert2} = wrek:put_sandbox(Parent, Dir),
+    Data2 = Data#{name(State) => Vert2},
+    {reply, Dir, State#state{data = Data2, vert = Vert2}};
+
+handle_call({reuse_sandbox, Who}, _From, State = #state{parent = Parent}) ->
+    #state{data = Data} = State,
+    {Reply, State2} = case Data of
+        #{Who := V} ->
+            case wrek_vert_t:dir(V) of
+                undefined ->
+                    {{error, {no_sandbox, Who}}, State};
+                Dir ->
+                    {ok, Vert2} = wrek:put_sandbox(Parent, Dir),
+                    Data2 = Data#{name(State) => Vert2},
+                    {{ok, Dir}, State#state{data = Data2, vert = Vert2}}
+            end;
+        _ ->
+            {{error, {no_vert, Who, Data}}, State}
+    end,
+    {reply, Reply, State2};
 
 handle_call(_Req, _From, State) ->
     {reply, ok, State}.
