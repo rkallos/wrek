@@ -8,6 +8,7 @@
     has_succeeded/1,
     is_finished/1,
     succeed/2,
+    to_list/1,
     % getters
     args/1,
     deps/1,
@@ -147,6 +148,14 @@ is_finished(Vert = #?T{}) ->
 succeed(Vert = #?T{kv = Kv}, Result) ->
     Vert2 = set_kv(Vert, maps:merge(Kv, Result)),
     set_status(Vert2, done).
+
+
+-spec to_list(t()) -> [{atom(), any()}].
+
+to_list(T = #?T{}) ->
+    Fields = record_info(fields, ?T),
+    [_Tag | Values] = tuple_to_list(T),
+    lists:zip(Fields, Values).
 
 
 -spec args(t()) -> args_t().
