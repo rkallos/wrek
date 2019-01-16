@@ -32,7 +32,5 @@ exec(Dir0, Cmd0, Env, EventFun) ->
 
     case exec:run_link(Cmd, ExecOpts) of
         {ok, _Pid, _OsPid} = Ok -> Ok;
-        {error, Reason} = Err ->
-            EventFun(Reason),
-            Err
+        {error, _Reason} = Err -> Err
     end.

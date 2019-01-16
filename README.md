@@ -53,7 +53,7 @@ Example
 -export([run/2]).
 
 run(_Args, Parent) ->
-    Fun = wrek_vert:exec(Parent, ".", "true"),
+    {ok, Fun} = wrek_vert:exec(Parent, ".", "true"),
     ok = Fun(),
     {ok, #{}}.
 ```
