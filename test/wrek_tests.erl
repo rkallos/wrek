@@ -229,7 +229,7 @@ partial_success_test() ->
 
 
 timeout_test() ->
-    VertDefn = #{module => wrek_sleep_vert, args => [], deps => [], timeout => 0},
+    VertDefn = #{module => wrek_sleep_vert, args => [], deps => [], timeout => 10},
     VertMap = #{cat => VertDefn},
 
     {ok, EvMgr} = gen_event:start_link({local, wrek_test_manager}),
