@@ -7,6 +7,6 @@
 
 run(_Args, Parent) ->
     Pwd = os:cmd("pwd") -- "\n",
-    Fun = wrek_vert:exec(Parent, Pwd, "exit 1"),
+    {ok, Fun} = wrek_vert:exec(Parent, Pwd, "exit 1"),
     ok = Fun(), % should badmatch
     {ok, #{}}.

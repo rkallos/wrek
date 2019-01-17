@@ -6,7 +6,7 @@
 
 
 -spec exec(file:filename_all(), string(), env(), fun()) ->
-    ok | {error, _}.
+    {ok, pid(), integer()} | {error, _}.
 
 exec(Dir0, Cmd0, Env, EventFun) ->
     Fun = fun(Fd, _OsPid, Data) ->
@@ -21,7 +21,6 @@ exec(Dir0, Cmd0, Env, EventFun) ->
     end,
 
     ExecOpts = [
-        sync,
         {cd, Dir},
         {env, Env},
         {kill_timeout, 0},
@@ -32,8 +31,6 @@ exec(Dir0, Cmd0, Env, EventFun) ->
     Cmd = lists:flatten(Cmd0),
 
     case exec:run_link(Cmd, ExecOpts) of
-        {ok, []} -> ok;
-        {error, [{exit_status, ExitStatus}]} ->
-            EventFun({exit_status, ExitStatus}),
-            {error, {exit_status, ExitStatus}}
+        {ok, _Pid, _OsPid} = Ok -> Ok;
+        {error, _Reason} = Err -> Err
     end.

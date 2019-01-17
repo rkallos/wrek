@@ -7,6 +7,6 @@
 
 run(_Args, Parent) ->
     Pwd = os:cmd("pwd") -- "\n",
-    Fun = wrek_vert:exec(Parent, Pwd, "true"),
+    {ok, Fun} = wrek_vert:exec(Parent, Pwd, "true"),
     ok = Fun(),
     {ok, #{}}.
