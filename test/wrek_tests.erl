@@ -352,6 +352,46 @@ custom_exec_callback_test() ->
 
     ?assertEqual(Msg, <<"good">>).
 
+wrek_timeout_test() ->
+    exec:start(),
+    application:start(wrek),
+
+    {ok, EvMgr} = gen_event:start_link({local, wrek_test_manager}),
+    gen_event:add_handler(EvMgr, wrek_test_handler, [total, self()]),
+
+    VertMap = #{
+      one => ok_v([]),
+      two => ok_v([one]),
+      two_and_a_half => ok_v([one]),
+      three => ok_v([two])
+     },
+
+    {ok, _Pid} = wrek:start(VertMap, [{event_manager, EvMgr}, {global_timeout, 0}]),
+
+    Events = receive
+        #{evts := Evts} -> Evts
+    end,
+
+    gen_event:stop(EvMgr),
+
+    WrekStarts =
+        [E || E = #wrek_event{type = {wrek, start}} <- Events],
+    StartingVerts =
+        [E || E = #wrek_event{msg = {starting_vert, _}} <- Events],
+    VertStarts =
+        [E || E = #wrek_event{type = {vert, start}} <- Events],
+    VertDones =
+        [E || E = #wrek_event{type = {vert, done}} <- Events],
+    WrekDones =
+        [E || E = #wrek_event{type = {wrek, done}} <- Events],
+
+    ?assertEqual(1, length(WrekStarts)),
+    ?assertEqual(1, length(StartingVerts)),
+    ?assertEqual(1, length(VertStarts)),
+    ?assertEqual(0, length(VertDones)),
+    ?assertEqual(0, length(WrekDones)).
+
+
 %% private
 
 ok_v(Deps) ->

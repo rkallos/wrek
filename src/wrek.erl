@@ -27,7 +27,8 @@
 
 -type dag_map() :: #{any() := vert_defn()} | [{any(), vert_defn()}].
 
--type option() :: {event_manager, pid()} | {failure_mode, partial | total}.
+-type option() :: {event_manager, pid()} | {failure_mode, partial | total} |
+    {global_timeout, pos_integer() | undefined}.
 
 -export_type([
     dag_id/0,
@@ -104,6 +105,13 @@ handle_cast(_Req, State) ->
 
 -spec handle_info(_, state()) -> {noreply, state()}.
 
+handle_info(timeout, #state{
+       event_mgr = EvMgr,
+       id = Id
+      } = State) ->
+    wrek_event:wrek_error(EvMgr, Id, timeout),
+    {stop, timeout, State};
+
 handle_info({'EXIT', Pid, {shutdown, {ok, Data}}}, State) ->
     #state{wrek = Wrek} = State,
 
@@ -142,6 +150,12 @@ init({Id, DagMap, Opts}) ->
 
     EvMgr = proplists:get_value(event_manager, Opts, undefined),
     FailMode = proplists:get_value(failure_mode, Opts, total),
+
+    case proplists:get_value(global_timeout, Opts, undefined) of
+        T when is_integer(T) ->
+                {ok, _TRef} = timer:send_after(T, timeout);
+        undefined -> ok
+    end,
 
     Sandbox = make_dag_sandbox(Id),
 
