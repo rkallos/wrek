@@ -66,7 +66,18 @@ run(_Args, Parent) ->
 2> wrek:start(Map). % Runs one, then two+three concurrently
 ```
 
+Individual Vertex Timeout
+-------------------------
+
+``` erlang
+VertDefn = #{module => wrek_sleep_vert, args => [], deps => [], timeout => 10},
+
+```
+
+Where `timeout` is the number of milliseconds until normal completion
+or forced timeout.
+
 TODO
 ----
 
-- Add timeout for DAG. It might be worthwhile to have timeouts for individual vertices, too, but having a timeout for the whole graph is a start.
+- Add timeout for DAG. Timeouts for individual vertices have been implemented.
