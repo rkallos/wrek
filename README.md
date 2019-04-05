@@ -41,8 +41,15 @@ Options
 -------
 
 - `{event_manager, pid()}`: Specify a `gen_event` process to forward events to
-- `{failure_mode, partial | total}` (default: total): Switch between partial and total failure modes. Total failure will immediately shut down all running vertices within a DAG. Partial failure will cancel running all tasks reachable by any failed vertex, but will continue until all vertices finish running.
-
+- `{failure_mode, partial | total}` (default: total): Switch between
+  partial and total failure modes. Total failure will immediately shut
+  down all running vertices within a DAG. Partial failure will cancel
+  running all tasks reachable by any failed vertex, but will continue
+  until all vertices finish running.
+- `{global_timeout, integer() | undefined}`: Specify a timeout in
+  milliseconds by which the entire DAG will shutdown if it hasn't
+  already finished. An `undefined` value means no timeout. (default:
+  undefined)
 
 Example
 -------
@@ -76,8 +83,3 @@ VertDefn = #{module => wrek_sleep_vert, args => [], deps => [], timeout => 10},
 
 Where `timeout` is the number of milliseconds until normal completion
 or forced timeout.
-
-TODO
-----
-
-- Add timeout for DAG. Timeouts for individual vertices have been implemented.
