@@ -337,20 +337,33 @@ sandbox_test() ->
 custom_exec_callback_test() ->
     Self = self(),
     Callback = fun({_, Data}) ->
-        Self ! Data
+        Self ! {event_fun, Data}
     end,
+
+    {ok, EvMgr} = gen_event:start_link(),
+    gen_event:add_handler(EvMgr, wrek_cb_event_handler, [Self]),
 
     Dag = #{cb => #{module => wrek_echo_vert, args => [Callback, "good"], deps => []}},
 
-    wrek:start(Dag),
+    wrek:start(Dag, [{event_manager, EvMgr}]),
 
-    Msg = receive
-        M -> M
+    EventFunMsg = receive
+        {event_fun, Efm} -> Efm
     after
         500 -> bad
     end,
 
-    ?assertEqual(Msg, <<"good">>).
+    EventHandlerMsg = receive
+        {event_handler, Ehm} -> Ehm
+    after
+        500 -> bad
+    end,
+
+    gen_event:stop(EvMgr),
+
+    ?assertEqual(EventFunMsg, <<"good">>),
+    ?assertEqual(EventHandlerMsg, <<"good">>),
+    ?assertEqual(EventFunMsg, EventHandlerMsg).
 
 %% private
 
