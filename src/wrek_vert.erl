@@ -118,7 +118,12 @@ handle_call({exec, Dir, Cmd, Env}, _From, State = #state{event_mgr = EvMgr}) ->
         end,
     handle_exec(Dir, Cmd, Env, EventFun, State);
 
-handle_call({exec, Dir, Cmd, Env, EventFun}, _From, State) ->
+handle_call({exec, Dir, Cmd, Env, EventFun0}, _From, State = #state{event_mgr = EvMgr}) ->
+    EventFun =
+        fun(Msg) ->
+            wrek_event:exec_output(EvMgr, id(State), Msg),
+            EventFun0(Msg)
+        end,
     handle_exec(Dir, Cmd, Env, EventFun, State);
 
 handle_call({get, Who0, Key, Default}, _From, State) ->
