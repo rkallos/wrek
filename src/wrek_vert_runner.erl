@@ -37,8 +37,7 @@ handle_call({run, Module, Args, Parent}, _From, State) ->
     Result = Module:run(Args, Parent),
     case maps:get(stop_on_completion, State, true) of
         true ->
-            Reason = Result,
-            {stop, Reason, Result, State};
+            {stop, normal, Result, State};
         false ->
             {reply, Result, State}
     end.
