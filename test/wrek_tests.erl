@@ -52,6 +52,53 @@ ok_test() ->
 
     ?assertEqual(normal, Atom).
 
+ok_link_test() ->
+    error_logger:tty(false),
+    exec:start(),
+    application:start(wrek),
+
+    VertMap = #{
+      one => ok_v([]),
+      two => ok_v([one]),
+      two_and_a_half => ok_v([one]),
+      three => ok_v([two])
+     },
+
+    %% Run and track the runners
+    {ok, {Pid, RunnerSup}} = wrek:start_link(VertMap, []),
+
+    MonitorRef = erlang:monitor(process, Pid),
+
+    Atom = receive
+        {'DOWN', MonitorRef, process, Pid, A} -> A
+    end,
+
+    ?assertEqual(normal, Atom),
+
+    Children = [ X || {_, X, _, _} <- supervisor:which_children(RunnerSup) ],
+    true = lists:all(fun erlang:is_process_alive/1, Children),
+
+    %% Run it again with the same runners
+    {ok, {Pid2, RunnerSup}} = wrek:start_link(VertMap, [{runner_sup, RunnerSup}]),
+
+    MonitorRef2 = erlang:monitor(process, Pid2),
+
+    Atom2 = receive
+        {'DOWN', MonitorRef2, process, Pid2, A2} -> A2
+    end,
+
+    ?assertEqual(normal, Atom2),
+
+    %% Stop the runners
+    MonitorRef3 = erlang:monitor(process, RunnerSup),
+    exit(RunnerSup, normal),
+
+    Atom3 = receive
+        {'DOWN', MonitorRef3, process, RunnerSup, A3} -> A3
+    end,
+
+    ?assertEqual(normal, Atom3).
+
 not_ok_test() ->
     error_logger:tty(false),
     exec:start(),

@@ -2,7 +2,9 @@
 
 -export([put_sandbox/2,
          start/1,
-         start/2]).
+         start/2,
+        start_link/1,
+        start_link/2]).
 
 -behaviour(gen_server).
 -export([
@@ -43,7 +45,8 @@
     failure_mode = total     :: partial | total,
     id           = ?id()     :: dag_id(),
     sandbox      = undefined :: file:filename_all() | undefined,
-    wrek         = undefined :: wrek_t:t() | undefined
+    wrek         = undefined :: wrek_t:t() | undefined,
+    runner_sup   = undefined :: pid() | undefined
 }).
 
 -type state() :: #state{}.
@@ -67,12 +70,35 @@ start(Defns, Opts) ->
     Id = ?id(),
     ChildSpec = #{
       id => Id,
-      start => {gen_server, start_link, [?MODULE, {Id, Defns, Opts}, []]},
+      start => {gen_server, start_link, [?MODULE, {Id, Defns, undefined, Opts}, []]},
       restart => temporary,
       type => worker
      },
     supervisor:start_child(wrek_sup, ChildSpec).
 
+-spec start_link(dag_map()) -> {ok, {pid(), pid()}}.
+start_link(Defns) ->
+    start_link(Defns, []).
+
+-spec start_link(dag_map(), [option()]) -> {ok, {pid(), pid()}}.
+start_link(Defns, Opts) ->
+    Id = ?id(),
+    Names = maps:keys(Defns),
+    RunnerSup = case proplists:get_value(runner_sup, Opts) of
+                    undefined ->
+                        {ok, RS} = wrek_runner_sup:start_link(Names),
+                        RS;
+                    RS when is_pid(RS) ->
+                        RS
+                end,
+    ChildSpec = #{
+      id => Id,
+      start => {gen_server, start_link, [?MODULE, {Id, Defns, RunnerSup, Opts}, []]},
+      restart => temporary,
+      type => worker
+     },
+    {ok, WrekPid} = supervisor:start_child(wrek_sup, ChildSpec),
+    {ok, {WrekPid, RunnerSup}}.
 
 %% callbacks
 
@@ -141,9 +167,9 @@ handle_info(_Req, State) ->
     {noreply, State}.
 
 
--spec init({dag_id(), dag_map(), [option()]}) -> {ok, state()} | {stop, _}.
+-spec init({dag_id(), dag_map(), pid() | undefined, [option()]}) -> {ok, state()} | {stop, _}.
 
-init({Id, DagMap, Opts}) ->
+init({Id, DagMap, RunnerSup, Opts}) ->
     process_flag(trap_exit, true),
 
     {ok, Wrek} = wrek_t:from_verts(DagMap),
@@ -164,7 +190,8 @@ init({Id, DagMap, Opts}) ->
         failure_mode = FailMode,
         id = Id,
         sandbox = Sandbox,
-        wrek = Wrek
+        wrek = Wrek,
+        runner_sup = RunnerSup
      },
 
     wrek_event:wrek_start(EvMgr, Id, DagMap),
@@ -244,7 +271,8 @@ start_vert(State, Name) ->
     #state{
         event_mgr = EventMgr,
         id = DagId,
-        wrek = Wrek
+        wrek = Wrek,
+        runner_sup = RunnerSup
     } = State,
     VertId = {DagId, ?id()},
     Wrek2 = wrek_t:set_vert_id(Wrek, Name, VertId),
@@ -252,10 +280,20 @@ start_vert(State, Name) ->
 
     wrek_event:wrek_msg(EventMgr, DagId, {starting_vert, VertId}),
 
+    Runner = get_runner(Name, RunnerSup),
     Data = make_vert_data(State, Name),
-    Args = {Vert, Data, EventMgr, self()},
+    Args = {Vert, Runner, Data, EventMgr, self()},
     gen_server:start_link(wrek_vert, Args, []).
 
+get_runner(_Name, undefined) -> undefined;
+get_runner(Name, RunnerSup) ->
+    Children = supervisor:which_children(RunnerSup),
+    case lists:keyfind(Name, 1, Children) of
+        false ->
+            undefined;
+        {Name, Runner, _, _} ->
+            Runner
+    end.
 
 -spec start_verts_or_exit(state()) -> {noreply, state()} | {stop, normal, state()}.
 

@@ -29,7 +29,8 @@
     event_mgr = undefined :: pid()                       | undefined,
     parent    = undefined :: pid()                       | undefined,
     pids      = #{}       :: #{pid() => [pid()] | {result, any()}},
-    vert      = undefined :: wrek_vert_t:t()             | undefined
+    vert      = undefined :: wrek_vert_t:t()             | undefined,
+    run_id    = undefined :: term()
 }).
 -type state() :: #state{}.
 
@@ -224,6 +225,7 @@ handle_info({'EXIT', Pid, Term} = ExitMsg, State) ->
     } = State,
     case Pid of
         Child ->
+            %% Child exits unexpectedly
             wrek_event:vert_done(EvMgr, id(State), Term),
             {stop, {shutdown, Term}, State};
         _ ->
@@ -248,14 +250,24 @@ handle_info({'EXIT', Pid, Term} = ExitMsg, State) ->
             end
     end;
 
-handle_info(_Req, State) ->
-    {noreply, State}.
+handle_info(Msg, State) ->
+    #state{
+        event_mgr = EvMgr,
+        run_id = RunId
+    } = State,
+    case wrek_vert_runner:check_response(Msg, RunId) of
+        {reply, Term} ->
+            %% Child finishes executing the run/2 function
+            wrek_event:vert_done(EvMgr, id(State), Term),
+            {stop, {shutdown, Term}, State#state{run_id=undefined}};
+        no_reply ->
+            {noreply, State}
+    end.
 
-
--spec init({wrek_vert_t:t(), #{any() => wrek_vert_t:t()}, pid(), pid()}) ->
+-spec init({wrek_vert_t:t(), pid() | undefined, #{any() => wrek_vert_t:t()}, pid(), pid()}) ->
     {ok, state()}.
 
-init({Vert, Data, EventMgr, Parent}) ->
+init({Vert, Runner, Data, EventMgr, Parent}) ->
     process_flag(trap_exit, true),
 
     Id = wrek_vert_t:id(Vert),
@@ -272,17 +284,22 @@ init({Vert, Data, EventMgr, Parent}) ->
     wrek_event:vert_start(EventMgr, Id, Name, Module, Args),
 
     Self = self(),
-    Pid = spawn_link(fun() ->
-        Result = Module:run(Args, Self),
-        exit(Result)
-    end),
+    Pid = case Runner of
+              undefined ->
+                  {ok, P} = wrek_vert_runner:start_link(#{stop_on_completion => true}),
+                  P;
+              _ ->
+                  Runner
+          end,
+    RunId = wrek_vert_runner:send_request(Pid, Module, Args, Self),
 
     State = #state{
         child = Pid,
         data = Data,
         event_mgr = EventMgr,
         parent = Parent,
-        vert = Vert
+        vert = Vert,
+        run_id = RunId
     },
     {ok, State}.
 
