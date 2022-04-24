@@ -11,8 +11,8 @@
 -spec start_link(Names :: list(atom())) -> {ok, pid()} | ignore | {error, term()}.
 
 start_link(Names) ->
-    {ok, Sup} = supervisor:start_link({local, ?SERVER}, ?MODULE, []),
-    [ supervisor:start_child(?MODULE,
+    {ok, Sup} = supervisor:start_link(?MODULE, []),
+    [ supervisor:start_child(Sup,
                              #{id => X,
                                start => {wrek_vert_runner, start_link, [#{stop_on_completion => false}]},
                                restart => temporary,
